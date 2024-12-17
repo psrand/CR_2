@@ -25,8 +25,7 @@ library(dplyr)
 library(classInt)
 
 #Produce map and plot tagging location and ground receiver locations
-
-setwd("~/InputFiles/CR_ShapeFiles/")
+setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/CR_ShapeFiles/")
 
 #Read in shape files
 CopperT<-sf::read_sf("CopperRTribs.shp")
@@ -70,14 +69,15 @@ elevation_df <- data.frame(
 # View the result
 head(elevation_df)
 
-setwd("~/PlaceNames/")
+setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/PlaceNames/")
+
 
 Copper_PlaceNames<-read.csv(file="Copper_PlaceNames.csv")
 Copper_PlaceNames<-Copper_PlaceNames[c(-5,-6),]
 placenames_sf = st_as_sf (Copper_PlaceNames,coords = c("Longitude","Latitude"),crs = 4326, agr = "constant")
 
 #Read in receiver station positions
-Receiver_Loc<-read.csv(file="C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperTelemetry/Receiver_GPS_Locations/Receiver_Loc_For2005.csv")
+Receiver_Loc<-read.csv(file="C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/GroundReceiverStations/Receiver_Loc_For2005.csv")
 receivers_sf = st_as_sf (Receiver_Loc,coords = c("Longitude","Latitude"),crs = 4326, agr = "constant")
 
 #This produces map with ground receiver telemetry stations as red points.
@@ -98,7 +98,7 @@ map_CR
 
 
 #Read in and plot aerial data
-setwd("~/InputFiles/AerialDetections_2005/")
+setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/AerialDetections_2005/")
 
 # Initialize an empty list to store the dataframes
 survey_data <- list()
@@ -117,7 +117,7 @@ file_names <- c(
 
 # Loop over the file names to read in the data
 for (file_name in file_names) {
-  file_path <- file.path(getwd(), "Aerial_Recx_2005", file_name)
+  file_path <- file.path(getwd(), file_name)
   survey_df <- read.csv(file_path)
   # Conditionally remove columns 12 to 15 for the specific file
   if (file_name == "aerial0805-07 and 31.csv") {
@@ -128,6 +128,12 @@ for (file_name in file_names) {
 
 # Combine all dataframes into a single dataframe
 All_Fish_Air <- do.call(rbind, survey_data)
+
+
+#Remove rows where Latitude and Longitude appear as "0"
+
+# Remove rows where Latitude or Longitude is 0
+All_Fish_Air <- All_Fish_Air[!(All_Fish_Air$Latitude == 0 | All_Fish_Air$Longitude == 0), ]
 
 #Need to clean up with dplyr
 
@@ -161,8 +167,9 @@ All_Fish_Air<- All_Fish_Air %>%
 #Read in tagging data and process it
 
 #This is file (worksheet in a spreadsheet) shared by Matt Piche in early 2024 for FCA project
+setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/TaggingData/")
 
-Tag<-read_excel("~/InputFiles/TaggingData/SRT TFA_19Mar2006.xls", sheet = "Tag fates")
+Tag<-read_excel("SRT TFA_19Mar2006.xls", sheet = "Tag fates")
 
 #Deal with dates and times
 Tag$TAG_DATE<-as.POSIXct(Tag$TAG_DATE,format="%m/%d/%y")
@@ -416,14 +423,6 @@ FD$elevation <- elevation_df$elevation[nearest_elevation_idx]
 # View the updated fish_distances data frame with elevation
 head(FD)
 
-Summary_ByPopulation <- ddply(FD, .(SpawnG_Name), summarise,
-                              TravelDistance = as.integer(round(mean(river_distance_km))),
-                              SpawnG_Elevation = as.integer(round(mean(elevation)))
-)
-
-# View the result
-head(Summary_ByPopulation)
-
 #Produce map with elevation
 # Generate breaks within the restricted range
 breaks <- classIntervals(FD$elevation, n = 9, style = "pretty")$brks
@@ -464,11 +463,11 @@ map_CR
 #Plot map with distances data
 
 # Add a new column with distances in kilometers
-fish_distances <- fish_distances %>%
+FD <- FD %>%
   mutate(river_distance_km = as.numeric(river_distance / 1000))
 
 # Restrict distances to the range 4500 to 267000
-restricted_distances <- fish_distances$river_distance_km
+restricted_distances <- FD$river_distance_km
 restricted_distances <- restricted_distances[restricted_distances >= 4.5 & restricted_distances <= 267]
 
 # Generate breaks within the restricted range
@@ -483,7 +482,7 @@ map_CR <- tm_shape(masked_CR) +
   tm_scale_bar(position = c("right", "bottom"), width = 0.15, text.size = 1.4) +
   tm_shape(placenames_sf) + tm_symbols(col = "black", size = .7, scale = .8, border.lwd = NA) +
   tm_text("Site", just = "left", scale = .8, xmod = .3, ymod = -0.3) +
-  tm_shape(fish_distances) +
+  tm_shape(FD) +
   tm_symbols(
     col = "river_distance_km",  # Use numeric column for color mapping
     palette = brewer.pal(12, "YlOrRd"),  # Color palette
@@ -505,4 +504,12 @@ map_CR <- tm_shape(masked_CR) +
 
 # View the map
 map_CR
+
+Summary_ByPopulation <- ddply(FD, .(SpawnG_Name), summarise,
+                              N = length(river_distance_km),  # Count the number of rows in each group
+                              TravelDistance = as.integer(round(mean(river_distance_km))),
+                              SpawnG_Elevation = as.integer(round(mean(elevation)))
+)
+
+
 
