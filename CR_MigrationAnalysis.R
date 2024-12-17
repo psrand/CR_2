@@ -3,6 +3,8 @@
 # aerial survey results (example here is from 2005 NVE study), and digital elevation data.
 # Program estimates metrics for all the main spawning groups of CR sockeye
 
+#Created by Pete Rand, PWSSC
+
 #****************************************************************************************************************************************************
 
 #Chunk H:
@@ -24,7 +26,7 @@ library(classInt)
 
 #Produce map and plot tagging location and ground receiver locations
 
-setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperRiver_NiceMap/ShapeFiles/")
+setwd("~/InputFiles/CR_ShapeFiles/")
 
 #Read in shape files
 CopperT<-sf::read_sf("CopperRTribs.shp")
@@ -68,7 +70,7 @@ elevation_df <- data.frame(
 # View the result
 head(elevation_df)
 
-setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperTelemetry/")
+setwd("~/PlaceNames/")
 
 Copper_PlaceNames<-read.csv(file="Copper_PlaceNames.csv")
 Copper_PlaceNames<-Copper_PlaceNames[c(-5,-6),]
@@ -96,7 +98,7 @@ map_CR
 
 
 #Read in and plot aerial data
-setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperTelemetry/")
+setwd("~/InputFiles/AerialDetections_2005/")
 
 # Initialize an empty list to store the dataframes
 survey_data <- list()
@@ -160,7 +162,7 @@ All_Fish_Air<- All_Fish_Air %>%
 
 #This is file (worksheet in a spreadsheet) shared by Matt Piche in early 2024 for FCA project
 
-Tag<-read_excel("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperTelemetry/TaggingData/SRT TFA_19Mar2006.xls", sheet = "Tag fates")
+Tag<-read_excel("~/InputFiles/TaggingData/SRT TFA_19Mar2006.xls", sheet = "Tag fates")
 
 #Deal with dates and times
 Tag$TAG_DATE<-as.POSIXct(Tag$TAG_DATE,format="%m/%d/%y")
