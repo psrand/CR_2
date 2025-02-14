@@ -5,26 +5,248 @@ date: "`r Sys.Date()`"
 output: word_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE)
 ```
 
-## R Markdown
+#' =====================================================
+#' Calculating Migratory Difficulty for Spawning Populations (Elevation, Distance)
+#' =====================================================
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+### Pete's initial code
+```{r}
+#-----
+#Estimate river mile for Baird, Canyon, and Chitina for modeling, try using Pete's code
+# Reset R, clear all objects
+rm(list=ls()) 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Set WD
+DataSet<- read.csv("InputFiles/upperriver_CollectionLocations_LatLong.csv")
+unique(DataSet$Col_Location_Lat) 
+unique(DataSet$Col_Location_Long) 
 
-```{r cars}
-summary(cars)
+#So confirms we have 10 lat/longs for the 3 locations
+
+#Required packages
+library(sf)
+library(elevatr)
+library(tmap)
+library(raster)
+library(plyr)
+library(readxl)
+library(lubridate)
+library(tmap)
+library(RColorBrewer)
+library(ggplot2)
+library(scales)
+library(dplyr)
+library(classInt)
+
+
+#Read in shape files
+CopperT<-sf::read_sf("InputFiles/CR_ShapeFiles/CopperRTribs.shp")
+class(CopperT)
+#watershed boundary
+CopperWB<-sf::read_sf("InputFiles/CR_ShapeFiles/CopperRiverWBD.shp")
+
+#convert to coordinates
+CopperT = st_transform(CopperT, "+init=epsg:4326")
+CopperWB = st_transform(CopperWB, "+init=epsg:4326")
+
+#Read in elevation data
+dem_Copper<-get_elev_raster(CopperWB,,z=7)
+elev_crop = crop(dem_Copper, CopperWB)
+
+slope = terrain(elev_crop, opt = "slope")
+aspect = terrain(elev_crop, opt = "aspect")
+
+hill = hillShade(slope, aspect, angle = 40, direction = 270)
+masked_CR <- mask(hill, CopperWB)
+
+#River network
+river_sf = st_as_sf(CopperT)
+
+# Ensure CRS consistency between CopperT and elev_crop
+CT <- st_transform(CopperT, crs(elev_crop))  # Transform CopperT to the CRS of the raster
+
+# Extract coordinates (longitude and latitude) from CopperT
+coordinates_xy <- st_coordinates(CT)[, 1:2]  # Keep only the first two columns (longitude and latitude)
+
+# Extract elevation values for each point from the raster
+elevation_values <- extract(elev_crop, coordinates_xy)
+
+# Create a data frame with x, y coordinates and corresponding elevation values (in meters ASL)
+elevation_df <- data.frame(
+  x = coordinates_xy[, 1],  # Longitude
+  y = coordinates_xy[, 2],  # Latitude
+  elevation = unlist(elevation_values)  # Elevation, unlisted in case it's a list
+)
+
+# View the result
+head(elevation_df)
+
+#setwd("C:/Users/PeteRand/OneDrive - Prince William Sound Science Center/RWorkingDirectory/CopperSalmonGitHub/CopperSalmon/InputFiles/PlaceNames/")
+
+Copper_PlaceNames<-read.csv(file="InputFiles/PlaceNames/Copper_PlaceNames.csv")
+Copper_PlaceNames<-Copper_PlaceNames[c(-5,-6),]
+placenames_sf = st_as_sf (Copper_PlaceNames,coords = c("Longitude","Latitude"),crs = 4326, agr = "constant")
+
+#Read in receiver station positions
+Receiver_Loc<-read.csv(file="InputFiles/GroundReceiverStations/Receiver_Loc_For2005.csv")
+Receiver_Loc<-read.csv("InputFiles/GroundReceiverStations/Receiver_Loc_For2005.csv")
+receivers_sf = st_as_sf (Receiver_Loc,coords = c("Longitude","Latitude"),crs = 4326, agr = "constant")
 ```
 
-## Including Plots
+### Distance calculations for Upper River Spawning Populations
+```{r}
+#Estimate distance traveled for each fish that are located in tributaries
+# Step 1: Create the river mouth point using the provided coordinates (location here is Baird tagging site - might want to use lower river site, tagging site is about 70 km from flats)
+# Load necessary libraries
+library(sf)
+library(dplyr)
 
-You can also embed plots, for example:
+# Step 1: Read your CSV data
+DataSet <- read.csv("InputFiles/upperriver_CollectionLocations_LatLong.csv")
+str(DataSet)
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Step 2: Convert the data frame to a spatial object (sf)
+upperriver_sf <- st_as_sf(DataSet, coords = c("Col_Location_Long", "Col_Location_Lat"), crs = 4326)
+
+# Check the CRS of upperriver_sf
+print(st_crs(upperriver_sf))
+
+# Step 3: Define river mouth coordinates as a simple feature (sf)
+river_mouth_coords <- st_sfc(st_point(c(-145.071545, 60.273234)), crs = 4326) # Uses entrance of CR at flats
+mouth_of_river <- st_sf(geometry = river_mouth_coords)
+
+# Check the CRS of mouth_of_river
+print(st_crs(mouth_of_river))
+
+# Step 4: Ensure both objects have the same CRS
+mouth_of_river <- st_transform(mouth_of_river, st_crs(upperriver_sf))  # Transform mouth_of_river to match upperriver_sf CRS
+
+# Verify CRS after transformation
+print(st_crs(mouth_of_river))
+
+# Step 5: Convert DataSet to an sf object (if it's not already)
+# This step ensures that your DataSet has the proper geometry column for distance calculation
+DataSet_sf <- st_as_sf(DataSet, coords = c("Col_Location_Long", "Col_Location_Lat"), crs = 4326)
+
+# Check the CRS of the new DataSet_sf
+print(st_crs(DataSet_sf))
+
+# Step 6: Calculate the distance from each fish location to the river mouth
+Coll_distances <- DataSet_sf %>%
+  mutate(
+    # Calculate distance from fish location to the river mouth point
+    river_distance = st_distance(geometry, mouth_of_river$geometry)
+  )
+
+# Step 7: Print the resulting distances data
+print(Coll_distances)
+
+```
+Simple feature collection with 10 features and 2 fields
+Geometry type: POINT
+Dimension:     XY
+Bounding box:  xmin: -145.9685 ymin: 61.37921 xmax: -143.3071 ymax: 63.10004
+Geodetic CRS:  WGS 84
+   Collection_Location                   geometry river_distance
+1   Fish Creek Gulkana POINT (-145.4813 63.10004)   315067.5 [m]
+2     Gulkana Hatchery POINT (-145.5138 63.06733)   311562.8 [m]
+3             Mentasta POINT (-143.3598 62.94958)   311023.4 [m]
+4               Tanada POINT (-143.3822 62.45133)   258364.5 [m]
+5              St Anne POINT (-145.9685 61.73953)   170057.2 [m]
+6                Mahlo POINT (-145.7294 61.73588)   166457.6 [m]
+7            Long Lake POINT (-143.3071 61.37921)   155777.7 [m]
+8          Copper Lake POINT (-143.4818 62.42725)   254050.4 [m]
+9         Klutina Lake  POINT (-145.3325 61.9515)   187140.6 [m]
+10       Upper Klutina POINT (-145.7163 61.75142)   167996.3 [m]
+
+
+### Elevation Calculations
+```{r}
+# Assuming you already have all necessary packages and data
+
+# Step 1: Make sure upperriver_sf is in the same CRS as your DEM
+upperriver_sf <- st_transform(upperriver_sf, crs = crs(elev_crop))  # Transform upperriver_sf to the CRS of the raster
+
+# Step 2: Extract coordinates from upperriver_sf
+coordinates_xy <- st_coordinates(upperriver_sf)[, 1:2]  # 10 extracted lat/longs
+
+# Step 3: Extract elevation values for each point from the DEM raster
+elevation_values <- extract(elev_crop, coordinates_xy)
+
+# Step 4: Add elevation values to the upperriver_sf data
+upperriver_sf$elevation.m <- unlist(elevation_values)  # Add extracted elevations to your sf object
+
+# Check the result to see if elevation values were added
+print(upperriver_sf)
+
+elevation_df <- data.frame(
+  Collection_Location = upperriver_sf$Collection_Location,  # Assuming this is the column name
+  Longitude = coordinates_xy[, 1],
+  Latitude = coordinates_xy[, 2],
+  "Elevation.m" = unlist(elevation_values), # Elevation values from raster extraction 
+  "Distance.m" = Coll_distances
+)
+
+# View the result (optional)
+head(elevation_df)
+print(elevation_df)
+
+
+
+# Add the river_distance from Coll_distances to your elevation dataframe
+UpperRiverSpawning_MigratoryDifficulty_df <- data.frame(
+  Collection_Location = upperriver_sf$Collection_Location,  # Assuming this is the column name
+  Longitude = st_coordinates(upperriver_sf)[, 1],  # Longitude
+  Latitude = st_coordinates(upperriver_sf)[, 2],  # Latitude
+  Elevation_m = unlist(elevation_values),  # Elevation values from raster extraction 
+  River_Distance_m = st_distance(upperriver_sf, mouth_of_river)  # Get river distance for each point
+)
+
+# View the result (optional)
+head(UpperRiverSpawning_MigratoryDifficulty_df)
+print(UpperRiverSpawning_MigratoryDifficulty_df)
+
+write.csv(UpperRiverSpawning_MigratoryDifficulty_df, "UpperRiverSpawning_MigratoryDifficulty.csv")
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+### Visualizing Migratory Difficulty
+```{r}
+rm(list=ls()) 
+DataSet <- read.csv("UpperRiverSpawning_MigratoryDifficulty.csv")[,-1]
+str(DataSet)
+
+library(ggplot2)
+
+# Scatter plot to visualize the relationship between river distance and elevation
+ggplot(DataSet, aes(x = River_Distance_m, y = Elevation_m, color = Collection_Location)) +
+  geom_point(size = 3) +
+  labs(title = "Migratory Difficulty: Elevation vs River Distance",
+       x = "River Distance (m)", y = "Elevation (m)") +
+  theme_minimal() +
+  theme(legend.position = "bottom") 
+
+# Color-coded Scatter Plot: Elevation and River Distance
+# Min-Max Normalization for scaling both variables between 0 and 1
+DataSet$scaled_elevation <- (DataSet$Elevation_m - min(DataSet$Elevation_m)) / (max(DataSet$Elevation_m) - min(DataSet$Elevation_m))
+DataSet$scaled_distance <- (DataSet$River_Distance_m - min(DataSet$River_Distance_m)) / (max(DataSet$River_Distance_m) - min(DataSet$River_Distance_m))
+
+# Combine them equally weighted
+DataSet$combined_value <- DataSet$scaled_elevation + DataSet$scaled_distance
+ggplot(DataSet, aes(x = River_Distance_m, y = Elevation_m, color = combined_value)) +
+  geom_point(size = 4) +  # Add points to the plot
+  scale_color_gradient(low = "blue", high = "red") +  # Color gradient for combined_value
+  geom_text(aes(label = Collection_Location), vjust = -1, hjust = 0.5, size = 3, color = "black") +  # Add labels above each point
+  labs(
+    title = "Heatmap: Combined Elevation and River Distance",
+    x = "River Distance (m)",
+    y = "Elevation (m)",
+    color = "Difficulty"
+  ) +
+  theme_minimal()
+```
