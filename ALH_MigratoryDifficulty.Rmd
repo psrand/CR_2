@@ -211,6 +211,7 @@ ADFG_MigratoryDifficulty_df$Work <- (ADFG_MigratoryDifficulty_df$Elevation_m*ADF
 # View the result (optional)
 head(ADFG_MigratoryDifficulty_df)
 print(ADFG_MigratoryDifficulty_df)
+str(ADFG_MigratoryDifficulty_df)
 
 write.csv(ADFG_MigratoryDifficulty_df, "ADFGBaselineCollection_MigratoryDifficulty.csv")
 
@@ -251,6 +252,51 @@ ggplot(DataSet, aes(x = River_Distance_m, y = Elevation_m, color = combined_valu
     color = "Difficulty"
   ) +
   theme_minimal()
+
+
+
+#### Map for River Slope for each of the ADFG baseline locations ####
+
+# Install necessary libraries if not already installed
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+
+# First, define the region of interest (center of the map)
+# For example, based on the average latitude and longitude
+center_lat <- mean(DataSet$Latitude)
+center_lon <- mean(DataSet$Longitude)
+
+# Retrieve a map of the region using ggmap
+register_google(key = "AIzaSyA55RnLVmF9pNL7h1EZGlBCwBeZViogWRU")
+map <- get_map(location = c(lon = center_lon, lat = center_lat), zoom = 7, source = "google", maptype = "satellite")
+
+
+# Adjust the latitude for point 20 so its separate from 21 a bit more
+DataSet$Adjusted_Latitude <- DataSet$Latitude
+DataSet$Adjusted_Latitude[DataSet$Location_ID == 20] <- DataSet$Latitude[DataSet$Location_ID == 20] - 0.05  # Adjust by a small value
+
+# Create the map with adjusted point
+ggmap(map) +
+  # Plot the points with color for river slope and size adjustment for visibility
+  geom_point(data = DataSet, aes(x = Longitude, y = Latitude, color = River_Slope), 
+             size = 5, alpha = 0.7) +
+  
+  # Add text labels (numbers in this case) to the points
+  geom_text(data = DataSet, aes(x = Longitude, y = Adjusted_Latitude, label = Location_ID), 
+            size = 3, fontface = "bold", hjust = -0.4, color = "yellow") +  # Adjust as needed to prevent overlap
+  
+  # Add color scale for river slope
+  scale_color_gradient(low = "blue", high = "red", name = "River Slope") + 
+  
+  # Customize the title and axes labels
+  labs(title = "The Average River Slope for Migration to ADF&G Baseline Spawning Locations", 
+       x = "Longitude", 
+       y = "Latitude") +
+  
+  # Add a minimal theme to reduce clutter
+  theme_minimal() 
+
 ```
 
 
