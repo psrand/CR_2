@@ -201,8 +201,12 @@ ADFG_MigratoryDifficulty_df <- data.frame(
   Longitude = st_coordinates(ADFG_sf)[, 1],  # Longitude
   Latitude = st_coordinates(ADFG_sf)[, 2],  # Latitude
   Elevation_m = unlist(elevation_values),  # Elevation values from raster extraction 
-  River_Distance_m = st_distance(ADFG_sf, mouth_of_river)  # Get river distance for each point
+  River_Distance_m = st_distance(ADFG_sf, mouth_of_river) # Get river distance for each point
 )
+
+ADFG_MigratoryDifficulty_df$River_Slope <- (ADFG_MigratoryDifficulty_df$Elevation_m / ADFG_MigratoryDifficulty_df$River_Distance_m)*500 # Slope of River (as defined by Crossin 2004)
+
+ADFG_MigratoryDifficulty_df$Work <- (ADFG_MigratoryDifficulty_df$Elevation_m*ADFG_MigratoryDifficulty_df$River_Distance_m) / 1000 # metric for Work as defined by Crossin 2004
 
 # View the result (optional)
 head(ADFG_MigratoryDifficulty_df)
