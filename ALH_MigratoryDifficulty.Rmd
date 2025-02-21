@@ -2,7 +2,9 @@
 title: "ALH_MigratoryDifficulty"
 author: "Abby Host"
 date: "`r Sys.Date()`"
-output: word_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include = FALSE}
@@ -252,53 +254,76 @@ ggplot(DataSet, aes(x = River_Distance_m, y = Elevation_m, color = combined_valu
     color = "Difficulty"
   ) +
   theme_minimal()
+```
+### Another Style of Map to visualize river slope for baseline locations, spatially
+```{r}
+rm(list=ls()) 
+DataSet <- read.csv("ADFGBaselineCollection_MigratoryDifficulty.csv")[,-1]
+str(DataSet)
 
-
-
-#### Map for River Slope for each of the ADFG baseline locations ####
-
-# Install necessary libraries if not already installed
+# Load libraries
+library(leaflet)
+library(dplyr)
 library(ggplot2)
 library(ggmap)
 library(dplyr)
+library(sf)
+library(tmap)
 
-# First, define the region of interest (center of the map)
-# For example, based on the average latitude and longitude
-center_lat <- mean(DataSet$Latitude)
-center_lon <- mean(DataSet$Longitude)
+# Assuming you have a vector of Location IDs in order from 1 to 24
+DataSet$Location_ID <- 1:nrow(DataSet)
 
-# Retrieve a map of the region using ggmap
-register_google(key = "AIzaSyA55RnLVmF9pNL7h1EZGlBCwBeZViogWRU")
-map <- get_map(location = c(lon = center_lon, lat = center_lat), zoom = 7, source = "google", maptype = "satellite")
+library(leaflet)
 
+# Define a color palette for the River_Slope with a red gradient
+pal <- colorNumeric(palette = "Reds", domain = DataSet$River_Slope)
 
-# Adjust the latitude for point 20 so its separate from 21 a bit more
-DataSet$Adjusted_Latitude <- DataSet$Latitude
-DataSet$Adjusted_Latitude[DataSet$Location_ID == 20] <- DataSet$Latitude[DataSet$Location_ID == 20] - 0.05  # Adjust by a small value
+# Create the leaflet map
+leaflet_map <- leaflet(DataSet) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    lng = ~Longitude, lat = ~Latitude, 
+    radius = 10,  # Adjust the size of the markers
+    color = ~pal(River_Slope),  # Color the markers based on River_Slope
+    stroke = FALSE, fillOpacity = 0.7,  # Adjust opacity
+    popup = ~paste("Collection Location:", Collection_Location, "<br>", "River Slope:", round(River_Slope,2)),  # Show Collection Location in popup
+    label = ~Collection_Location,  # Show Collection Location as label
+    labelOptions = labelOptions(noHide = TRUE, direction = "top")
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal, values = ~River_Slope, 
+    title = "River Slope", opacity = 1
+  )  # Add legend for River Slope
 
-# Create the map with adjusted point
-ggmap(map) +
-  # Plot the points with color for river slope and size adjustment for visibility
-  geom_point(data = DataSet, aes(x = Longitude, y = Latitude, color = River_Slope), 
-             size = 5, alpha = 0.7) +
-  
-  # Add text labels (numbers in this case) to the points
-  geom_text(data = DataSet, aes(x = Longitude, y = Adjusted_Latitude, label = Location_ID), 
-            size = 3, fontface = "bold", hjust = -0.4, color = "yellow") +  # Adjust as needed to prevent overlap
-  
-  # Add color scale for river slope
-  scale_color_gradient(low = "blue", high = "red", name = "River Slope") + 
-  
-  # Customize the title and axes labels
-  labs(title = "The Average River Slope for Migration to ADF&G Baseline Spawning Locations", 
-       x = "Longitude", 
-       y = "Latitude") +
-  
-  # Add a minimal theme to reduce clutter
-  theme_minimal() 
+# Display the map
+leaflet_map
+
+# Define a color palette for the DataSet$Work with a red to blue gradient
+pal2 <- colorNumeric(palette = c("red", "blue"), domain = DataSet$Work)
+
+# Create the leaflet map
+leaflet_map1 <- leaflet(DataSet) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    lng = ~Longitude, lat = ~Latitude, 
+    radius = 10,  # Adjust the size of the markers
+    color = ~pal2(Work),  # Color the markers based on DataSet$Work using the red to blue gradient
+    stroke = FALSE, fillOpacity = 0.7,  # Adjust opacity
+    popup = ~paste("Collection Location:", Collection_Location, "<br>", "Work Value:", round(Work)),  # Show Collection Location and Work value in popup
+    label = ~Collection_Location,  # Show Collection Location as label
+    labelOptions = labelOptions(noHide = TRUE, direction = "top")
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal2, values = ~Work,  # Use DataSet$Work for legend
+    title = "Work (where W = (Distance*Elevation)/1000)", opacity = 1
+  )  # Add legend for DataSet$Work
+
+leaflet_map1
+
 
 ```
-
 
 
 
@@ -561,42 +586,6 @@ ggplot(DataSet, aes(x = River_Distance_m, y = Elevation_m, color = combined_valu
     color = "Difficulty"
   ) +
   theme_minimal()
-
-
-
-
-#### Map for River Slope for each of the body comp spawning locations ####
-
-# Install necessary libraries if not already installed
-library(ggplot2)
-library(ggmap)
-library(dplyr)
-
-# First, define the region of interest (center of the map)
-# For example, based on the average latitude and longitude
-center_lat <- mean(DataSet$Latitude)
-center_lon <- mean(DataSet$Longitude)
-
-# Retrieve a map of the region using ggmap
-register_google(key = "AIzaSyA55RnLVmF9pNL7h1EZGlBCwBeZViogWRU")
-map <- get_map(location = c(lon = center_lon, lat = center_lat), zoom = 7, source = "google", maptype = "satellite")
-
-# Create the map with adjusted point
-ggmap(map) +
-  # Plot the points with color for river slope and size adjustment for visibility
-  geom_point(data = DataSet, aes(x = Longitude, y = Latitude, color = River_Slope), 
-             size = 5, alpha = 0.7) +
-  # Add color scale for river slope
-  scale_color_gradient(low = "blue", high = "red", name = "River Slope") + 
-  
-  # Customize the title and axes labels
-  labs(title = "The Average River Slope for Migration to ADF&G Baseline Spawning Locations", 
-       x = "Longitude", 
-       y = "Latitude") +
-  
-  # Add a minimal theme to reduce clutter
-  theme_minimal() 
-
 
 
                       #### Various plots utilizing distance, elevation, slope, work, etc #####

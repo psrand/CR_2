@@ -1,0 +1,84 @@
+---
+title: "ALH_CopperRiverWorkshop_Figures"
+author: "Abby Host"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE)
+```
+
+## Baseline Population Maps - River Slope & Work as units of migratory difficulty
+```{r}
+rm(list=ls()) 
+DataSet <- read.csv("ADFGBaselineCollection_MigratoryDifficulty.csv")[,-1] #load data
+str(DataSet) #structure of data
+
+# Load libraries, install as needed
+library(leaflet)
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+library(dplyr)
+library(sf)
+library(tmap)
+
+# Define a color palette for the River_Slope with a red gradient
+pal <- colorNumeric(palette = "Reds", domain = DataSet$River_Slope)
+
+# Create the leaflet map
+leaflet_map <- leaflet(DataSet) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    lng = ~Longitude, lat = ~Latitude, 
+    radius = 10,  # Adjust the size of the markers
+    color = ~pal(River_Slope),  # Color the markers based on River_Slope
+    stroke = FALSE, fillOpacity = 0.7,  # Adjust opacity
+    popup = ~paste("Collection Location:", Collection_Location, "<br>", "River Slope:", round(River_Slope,2)),  # Show Collection Location in popup
+    label = ~Collection_Location,  # Show Collection Location as label
+    labelOptions = labelOptions(noHide = TRUE, direction = "top")
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal, values = ~River_Slope, 
+    title = "River Slope", opacity = 1
+  )  # Add legend for River Slope
+
+# Display the map
+leaflet_map
+
+#Save map
+install.packages("htmlwidgets")
+library(htmlwidgets)
+saveWidget(leaflet_map, file = "River Slope of ADFG Copper River Baseline Populations.html")
+
+
+
+# Define a color palette for the Work with a red to blue gradient
+pal2 <- colorNumeric(palette = c("blue", "red"), domain = DataSet$Work)
+
+# Create the leaflet map
+leaflet_map1 <- leaflet(DataSet) %>%
+  addTiles() %>%  # Add default OpenStreetMap tiles
+  addCircleMarkers(
+    lng = ~Longitude, lat = ~Latitude, 
+    radius = 10,  # Adjust the size of the markers
+    color = ~pal2(Work),  # Color the markers based on DataSet$Work using the red to blue gradient
+    stroke = FALSE, fillOpacity = 0.7,  # Adjust opacity
+    popup = ~paste("Collection Location:", Collection_Location, "<br>", "Work Value:", round(Work)),  # Show Collection Location and Work value in popup
+    label = ~Collection_Location,  # Show Collection Location as label
+    labelOptions = labelOptions(noHide = TRUE, direction = "top")
+  ) %>%
+  addLegend(
+    position = "bottomright", 
+    pal = pal2, values = ~Work,  # Use DataSet$Work for legend
+    title = "Work (where W = (Distance*Elevation)/1000)", opacity = 1
+  )  # Add legend for DataSet$Work
+
+leaflet_map1
+saveWidget(leaflet_map1, file = "Work Metric of ADFG Copper River Baseline Populations.html")
+
+
+```
+```
