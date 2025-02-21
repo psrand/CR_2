@@ -154,7 +154,7 @@ saveWidget(leaflet_map1, file = "River Distance (from Flats) of ADFG Copper Rive
 
 
 
-#messing with a different map type:
+#messing with a different map type (topographical):
 leaflet(DataSet) %>%
   addTiles() %>%  # Adds default OpenStreetMap tiles
   addProviderTiles("OpenTopoMap") %>% # Add Stamen Terrain tiles for topographical map
