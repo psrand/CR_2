@@ -17,8 +17,6 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, eval = TRUE
 
 ### Pete's initial code + My Data
 ```{r}
-#-----
-#Estimate river mile for Baird, Canyon, and Chitina for modeling, try using Pete's code
 # Reset R, clear all objects
 rm(list=ls()) 
 
@@ -148,23 +146,6 @@ Coll_distances <- DataSet_sf %>%
 print(Coll_distances)
 
 ```
-Simple feature collection with 24 features and 3 fields
-Geometry type: POINT
-Dimension:     XY
-Bounding box:  xmin: -146.6231 ymin: 60.90318 xmax: -142.7216 ymax: 63.0999
-Geodetic CRS:  WGS 84
-First 10 features:
-                    Location               Group                   geometry river_distance
-1                Copper Lake Tanada/Copper lakes    POINT (-143.473 62.424)   253867.9 [m]
-2          Tanada Lake shore Tanada/Copper lakes      POINT (-143.37 62.41)   254313.6 [m]
-3   Tanada Lake lower outlet Tanada/Copper lakes  POINT (-143.3804 62.4705)   260385.7 [m]
-4          Tanada Creek weir Tanada/Copper lakes   POINT (-143.718 62.5959)   268093.4 [m]
-5             Bad Crossing 2               Slana POINT (-144.2594 62.99571)   305745.0 [m]
-6                 Bone Creek               Slana POINT (-143.8955 62.97175)   306417.6 [m]
-7              Mentasta Lake               Slana  POINT (-143.824 62.91896)   301486.3 [m]
-8               Suslota Lake               Slana  POINT (-143.5894 62.7051)   281602.9 [m]
-9         Gulkana-Fish Creek             Gulkana  POINT (-145.4872 63.0999)   315073.1 [m]
-10 Gulkana Hatchery late run    Gulkana hatchery  POINT (-145.497 63.00764)   304879.9 [m]
 
 
 ### Elevation Calculations
@@ -218,6 +199,81 @@ str(ADFG_MigratoryDifficulty_df)
 write.csv(ADFG_MigratoryDifficulty_df, "ADFGBaselineCollection_MigratoryDifficulty.csv")
 
 ```
+
+
+
+### New attempt at distance code, as this right now is using straight line distance which is incorrect
+```{r}
+rm(list=ls())
+
+# Required libraries
+library(sf)
+library(elevatr)
+library(dplyr)
+library(ggplot2)
+library(riverdist)
+
+
+
+# Step 1: Read the river shapefile
+CopperRiv <- st_read("InputFiles/CR_ShapeFiles/CopperRTribs.shp")
+
+# Step 2: Reproject the river shapefile to a projected CRS (e.g., UTM zone 10N)
+CopperRiv_projected <- st_transform(CopperRiv, crs = 32610)  # EPSG:32610 is UTM zone 10N, modify as needed
+
+# Step 3: Convert the river into a network (now in projected coordinates)
+CR_network <- line2network(CopperRiv_projected)
+
+# Step 5: Prepare the DataSet with locations and reproject it to the same CRS as the river
+DataSet <- read.csv("InputFiles/ADFG_BaselineLocations_LatLong.csv")
+# Define the new location, from the bounding box lowest map point above (from CopperT)
+new_location <- data.frame(
+  Location = "Copper River Lowest Lat",
+  Group = NA,  # You can add the appropriate group if needed
+  Collection_Lat = 60.46359,
+  Collection_Long = -144.8892
+)
+
+# Append the new location to the existing DataSet
+DataSet <- rbind(DataSet, new_location)
+DataSet_sf <- st_as_sf(DataSet, coords = c("Collection_Long", "Collection_Lat"), crs = 4326)
+DataSet_sf <- st_transform(DataSet_sf, crs = st_crs(CopperRiv_projected))  # Reproject dataset to match the river
+print(DataSet_sf)
+
+#Check the overlay of points on the river 
+ggplot() +
+  geom_sf(data = CopperRiv_projected, color = "blue") +
+  geom_sf(data = DataSet_sf, aes(color = "red"), shape = 19) + 
+  labs(title = "River Network with Locations") +
+  scale_color_identity()
+
+# Step 3: Convert the river shapefile into a river network
+CR_network <- line2network(CopperRiv_projected)
+# Verify the class of CR_network to ensure it's a 'rivernetwork'
+class(CR_network)
+
+?xy2segvert
+# Step 1: Extract coordinates for Copper River Lowest Lat (already done)
+lowest_lat_coords <- st_coordinates(DataSet_sf[DataSet_sf$Location == "Copper River Lowest Lat", ])
+
+# Extract longitude and latitude
+longitude <- lowest_lat_coords[1, 1]
+latitude <- lowest_lat_coords[1, 2]
+
+# Get river network segment and vertex for Copper River Lowest Lat
+river_location <- xy2segvert(x = longitude, y = latitude, rivers = CR_network)
+start_seg <- river_location$seg
+start_vert <- river_location$vert
+
+```
+
+
+
+
+
+
+
+
 
 
 ### Visualizing Migratory Difficulty
